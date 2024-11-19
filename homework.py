@@ -146,9 +146,55 @@ def calibrating_6_different(calibration_images, tag_size, spacing):
     return cameraMatrix, distCoeffs
 
 
+def apply_projective_transform(
+    source_image, destination_image, projective_transformation_matrix
+):
+    h, w = destination_image.shape[:2]
+    inv_matrix = np.linalg.inv(projective_transformation_matrix)
+    transformed_image = np.zeros_like(destination_image)
+
+    # Backward Homography
+    for y in range(h):
+        for x in range(w):
+            src_coords = inv_matrix @ np.array([x, y, 1])
+            src_x, src_y = src_coords[:2] / src_coords[2]
+            src_x, src_y = int(round(src_x)), int(round(src_y))
+
+            if (
+                0 <= src_x < source_image.shape[1]
+                and 0 <= src_y < source_image.shape[0]
+            ):
+                transformed_image[y, x] = source_image[src_y, src_x]
+
+    # Forward Homography
+    final_image = np.zeros_like(destination_image)
+    for y in range(h):
+        for x in range(w):
+            dst_coords = projective_transformation_matrix @ np.array([x, y, 1])
+            dst_x, dst_y = dst_coords[:2] / dst_coords[2]
+            dst_x, dst_y = int(round(dst_x)), int(round(dst_y))
+
+            if (
+                0 <= dst_x < destination_image.shape[1]
+                and 0 <= dst_y < destination_image.shape[0]
+            ):
+                final_image[dst_y, dst_x] = transformed_image[y, x]
+            else:
+                final_image[y, x] = [0, 0, 0]  # Make the square black if out of image
+
+    # Display the original and transformed images
+    cv2.imshow("Original Image", source_image)
+    cv2.imshow("Transformed Image", final_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    return final_image
+
+
 def main():
     ######################## TASK 1 ########################
     calibration_images = [cv2.imread(f"calibration\img{i}.png") for i in range(1, 29)]
+    stitching_images = [cv2.imread(f"stitching\img{i}.png") for i in range(1, 10)]
     tag_size = 1.68
     spacing = 0.70
 
@@ -169,23 +215,23 @@ def main():
     #     "The results are quite different, the first method(considering all markers and distances between them at once) is more accurate, because it uses all the information given. We we will be using intrinisic camera matrix from the first method further on."
     # )
 
-    # undistorted_images2 = simpler_calibrating(
-    #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
-    # )
-    # undistorted_images = []
-    # for img in calibration_images:
-    #     undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
-    #     undistorted_images.append(undistorted_image)
-    #     # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
-    #     # cv2.imshow("undistorted image", undistorted_image)
-    #     # cv2.waitKey(0)
-    # cv2.imshow(
-    #     "original image", calibration_images[0]
-    # )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
-    # cv2.imshow("undistorted image", undistorted_images[0])
-    # cv2.imshow("undistorted image 2", undistorted_images2[0])
-    # # FOR UNDISTORTION IT IS BETTER TO USE CALIBRATECAMERA FOR SINGLE IMAGE AS IT BETTER FITS TO THIS SPECIFIC IMAGE
-    # cv2.waitKey(0)
+    undistorted_images2 = simpler_calibrating(
+        calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
+    )
+    undistorted_images = []
+    for img in calibration_images:
+        undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
+        undistorted_images.append(undistorted_image)
+        # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+        # cv2.imshow("undistorted image", undistorted_image)
+        # cv2.waitKey(0)
+    cv2.imshow(
+        "original image", calibration_images[0]
+    )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+    cv2.imshow("undistorted image", undistorted_images[0])
+    cv2.imshow("undistorted image 2", undistorted_images2[0])
+    # FOR UNDISTORTION IT IS BETTER TO USE CALIBRATECAMERA FOR SINGLE IMAGE AS IT BETTER FITS TO THIS SPECIFIC IMAGE
+    cv2.waitKey(0)
 
     ######################## TASK 2 ########################
 
