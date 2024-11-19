@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 def object_points(width, spacing):
     objpts = []
-    for j in range(3):
-        for i in range(2):
+    for j in range(2):
+        for i in range(3):
             objpts.append(
                 np.array(
                     [
@@ -22,7 +22,8 @@ def object_points(width, spacing):
                     dtype=np.float32,
                 )
             )
-    return objpts
+    objpts = np.array(objpts)
+    return [objpts.reshape(1, 24, 3)]
 
 
 def simpler_object_points(width, spacing):
@@ -32,19 +33,22 @@ def simpler_object_points(width, spacing):
             dtype=np.float32,
         )
     ]
-    return objpts
+    objpts = np.array(objpts)
+    return [objpts.reshape(1, 4, 3)]
 
 
 def sort_corners(corners, ids):
-    cos = np.argsort(ids.flatten()).astype(int)
+    order = np.argsort(ids.flatten()).astype(int)
     sorted_corners = [
-        corners[cos[0]],
-        corners[cos[2]],
-        corners[cos[4]],
-        corners[cos[1]],
-        corners[cos[3]],
-        corners[cos[5]],
+        corners[order[5]],
+        corners[order[3]],
+        corners[order[1]],
+        corners[order[4]],
+        corners[order[2]],
+        corners[order[0]],
     ]
+    sorted_corners = np.array(sorted_corners)
+    sorted_corners = sorted_corners.reshape(1, 24, 2)
     return sorted_corners
 
 
@@ -52,7 +56,7 @@ def undistort_image(image, cameraMatrix, distCoeffs):
     h, w = image.shape[:2]
 
     new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(
-        cameraMatrix, distCoeffs, (w, h), alpha=1
+        cameraMatrix, distCoeffs, (w, h), alpha=0
     )
 
     R = np.eye(3)
@@ -71,19 +75,44 @@ def calibrating(calibration_images, tag_size, spacing):
     detector = cv2.aruco.ArucoDetector(dictionary, parameters)
     imgptsf = []
     objptsf = []
+    shape = (calibration_images[0].shape[1], calibration_images[0].shape[0])
     for img in calibration_images:
-        # Find ArUcO tags
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = detector.detectMarkers(gray)
         corners = sort_corners(corners, ids)
         objpts = object_points(tag_size, spacing)
-        shape = (img.shape[1], img.shape[0])
+
         objptsf.append(objpts)
         imgptsf.append(corners)
     _, cameraMatrix, distCoeffs, _, _ = cv2.calibrateCamera(
         objpts, corners, shape, None, None
     )
     return cameraMatrix, distCoeffs
+
+
+def simpler_calibrating(calibration_images, tag_size, spacing):
+    dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_16h5)
+    parameters = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(dictionary, parameters)
+
+    undistorted_img_2 = []
+    for img in calibration_images:
+        imgptsf = []
+        objptsf = []
+        shape = (img.shape[1], img.shape[0])
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        corners, ids, _ = detector.detectMarkers(gray)
+        corners = sort_corners(corners, ids)
+        objpts = object_points(tag_size, spacing)
+
+        objptsf.append(objpts)
+        imgptsf.append(corners)
+        _, cameraMatrix, distCoeffs, _, _ = cv2.calibrateCamera(
+            objpts, corners, shape, None, None
+        )
+        undistorted_img = undistort_image(img, cameraMatrix, distCoeffs)
+        undistorted_img_2.append(undistorted_img)
+    return undistorted_img_2
 
 
 def calibrating_6_different(calibration_images, tag_size, spacing):
@@ -101,16 +130,7 @@ def calibrating_6_different(calibration_images, tag_size, spacing):
             shape = (img.shape[1], img.shape[0])
             for i in range(6):
                 objptsf[i].append(objpts[0])
-                imgptsf[i].append(corners[i])
-    # for img in calibration_images:
-    #     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    #     corners, ids, _ = detector.detectMarkers(gray)
-    #     corners = sort_corners(corners, ids)
-    #     shape = (img.shape[1], img.shape[0])
-
-    #     for i in range(6):
-    #         objptsf[i].append(objpts)
-    #         imgptsf[i].append(corners[i])
+                imgptsf[i].append(corners[:, 4 * i : 4 * (i + 1), :])
 
     cameraMatrix = []
     distCoeffs = []
@@ -145,12 +165,28 @@ def main():
 
     print(cameraMatrix2)
     print(distCoeffs2)
+    print(
+        "The results are quite different, the first method(considering all markers and distances between them at once) is more accurate, because it uses all the information given. We we will be using intrinisic camera matrix from the first method further on."
+    )
 
-    # undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
-    # cv2.imshow("original image", img)
-    # cv2.imshow("undistorted image", undistorted_image)
-    # cv2.waitKey(0)
-    # for img in images:
+    ############## some break #############
+    undistorted_images2 = simpler_calibrating(
+        calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
+    )
+    undistorted_images = []
+    for img in calibration_images:
+        undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
+        undistorted_images.append(undistorted_image)
+        # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+        # cv2.imshow("undistorted image", undistorted_image)
+        # cv2.waitKey(0)
+    cv2.imshow(
+        "original image", calibration_images[0]
+    )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+    cv2.imshow("undistorted image", undistorted_images[0])
+    cv2.imshow("undistorted image 2", undistorted_images2[0])
+    # FOR UNDISTORTION IT IS BETTER TO USE CALIBRATECAMERA FOR SINGLE IMAGE AS IT BETTER FITS TO THIS SPECIFIC IMAGE
+    cv2.waitKey(0)
 
 
 if __name__ == "__main__":
