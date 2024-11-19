@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
+######################## TASK 1 FUNCTIONS  ########################
+
 
 def object_points(width, spacing):
     objpts = []
@@ -146,6 +148,9 @@ def calibrating_6_different(calibration_images, tag_size, spacing):
     return cameraMatrix, distCoeffs
 
 
+######################## TASK 2 FUNCTIONS  ########################
+
+
 def apply_projective_transform(
     source_image, destination_image, projective_transformation_matrix
 ):
@@ -153,7 +158,6 @@ def apply_projective_transform(
     inv_matrix = np.linalg.inv(projective_transformation_matrix)
     transformed_image = np.zeros_like(destination_image)
 
-    # Backward Homography
     for y in range(h):
         for x in range(w):
             src_coords = inv_matrix @ np.array([x, y, 1])
@@ -166,7 +170,6 @@ def apply_projective_transform(
             ):
                 transformed_image[y, x] = source_image[src_y, src_x]
 
-    # Forward Homography
     final_image = np.zeros_like(destination_image)
     for y in range(h):
         for x in range(w):
@@ -191,19 +194,71 @@ def apply_projective_transform(
     return final_image
 
 
+######################## TASK 3 FUNCTIONS  ########################
+
+
+def find_homography_matrix(source, destination):
+    A = np.zeros((2 * source.shape[1], 9), dtype=np.float64)
+    for i in range(source.shape[1]):
+        part = np.hstack([source[:, i].T, np.array([1])])
+
+        A[2 * i, 0:3] = part
+        A[2 * i, 6:9] = -part * destination[0, i]
+        A[2 * i + 1, 3:6] = part
+        A[2 * i + 1, 6:9] = -part * destination[1, i]
+    _, _, V = np.linalg.svd(A)
+    matrix = V[-1, :].reshape(3, 3)
+    matrix = matrix / matrix[2, 2]
+    return matrix
+
+
+def get_random_homography():
+    random_matrix = np.zeros((3, 3))
+    while np.linalg.det(random_matrix) == 0:
+        random_matrix = np.random.rand(3, 3)
+        random_matrix = random_matrix / random_matrix[2, 2]
+    return random_matrix
+
+
+def generate_random_points(num_points=100, range_min=0, range_max=100):
+    points = np.random.uniform(range_min, range_max, (2, num_points))
+    return points
+
+
+def test_homography():
+    np.set_printoptions(precision=18, suppress=True)
+    source = generate_random_points()
+    random_matrix = get_random_homography()
+    source_homogeneous = np.vstack([source, np.ones((1, source.shape[1]))])
+    destination_homogeneous = random_matrix @ source_homogeneous
+    destination_homogeneous /= destination_homogeneous[2, :]
+    destination = destination_homogeneous[:2, :]
+    test_matrix = find_homography_matrix(source, destination)
+    print(
+        f"The differences between homography matrix and its calculation: {np.subtract(random_matrix, test_matrix)}"
+    )
+    print()
+
+
+######################## TASK 4 FUNCTIONS  ########################
+
+
+######################## MAIN FUNCTION  ########################
+
+
 def main():
     ######################## TASK 1 ########################
-    calibration_images = [cv2.imread(f"calibration\img{i}.png") for i in range(1, 29)]
-    stitching_images = [cv2.imread(f"stitching\img{i}.png") for i in range(1, 10)]
-    tag_size = 1.68
-    spacing = 0.70
+    # calibration_images = [cv2.imread(f"calibration\img{i}.png") for i in range(1, 29)]
+    # stitching_images = [cv2.imread(f"stitching\img{i}.png") for i in range(1, 10)]
+    # tag_size = 1.68
+    # spacing = 0.70
 
-    cameraMatrix, distCoeffs = calibrating(
-        calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
-    )
+    # cameraMatrix, distCoeffs = calibrating(
+    #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
+    # )
 
-    print(cameraMatrix)
-    print(distCoeffs)
+    # print(cameraMatrix)
+    # print(distCoeffs)
 
     # cameraMatrix2, distCoeffs2 = calibrating_6_different(
     #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
@@ -215,25 +270,29 @@ def main():
     #     "The results are quite different, the first method(considering all markers and distances between them at once) is more accurate, because it uses all the information given. We we will be using intrinisic camera matrix from the first method further on."
     # )
 
-    undistorted_images2 = simpler_calibrating(
-        calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
-    )
-    undistorted_images = []
-    for img in calibration_images:
-        undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
-        undistorted_images.append(undistorted_image)
-        # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
-        # cv2.imshow("undistorted image", undistorted_image)
-        # cv2.waitKey(0)
-    cv2.imshow(
-        "original image", calibration_images[0]
-    )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
-    cv2.imshow("undistorted image", undistorted_images[0])
-    cv2.imshow("undistorted image 2", undistorted_images2[0])
-    # FOR UNDISTORTION IT IS BETTER TO USE CALIBRATECAMERA FOR SINGLE IMAGE AS IT BETTER FITS TO THIS SPECIFIC IMAGE
-    cv2.waitKey(0)
+    # undistorted_images2 = simpler_calibrating(
+    #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
+    # )
+    # undistorted_images = []
+    # for img in calibration_images:
+    #     undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
+    #     undistorted_images.append(undistorted_image)
+    #     # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+    #     # cv2.imshow("undistorted image", undistorted_image)
+    #     # cv2.waitKey(0)
+    # cv2.imshow(
+    #     "original image", calibration_images[0]
+    # )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+    # cv2.imshow("undistorted image", undistorted_images[0])
+    # cv2.imshow("undistorted image 2", undistorted_images2[0])
+    # # FOR UNDISTORTION IT IS BETTER TO USE CALIBRATECAMERA FOR SINGLE IMAGE AS IT BETTER FITS TO THIS SPECIFIC IMAGE
+    # cv2.waitKey(0)
 
     ######################## TASK 2 ########################
+    for i in range(10):
+        test_homography()
+
+    ######################## TASK 3 ########################
 
 
 if __name__ == "__main__":
