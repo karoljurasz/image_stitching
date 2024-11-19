@@ -147,7 +147,7 @@ def calibrating_6_different(calibration_images, tag_size, spacing):
 
 
 def main():
-    # Load your images here
+    ######################## TASK 1 ########################
     calibration_images = [cv2.imread(f"calibration\img{i}.png") for i in range(1, 29)]
     tag_size = 1.68
     spacing = 0.70
@@ -159,34 +159,35 @@ def main():
     print(cameraMatrix)
     print(distCoeffs)
 
-    cameraMatrix2, distCoeffs2 = calibrating_6_different(
-        calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
-    )
+    # cameraMatrix2, distCoeffs2 = calibrating_6_different(
+    #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
+    # )
 
-    print(cameraMatrix2)
-    print(distCoeffs2)
-    print(
-        "The results are quite different, the first method(considering all markers and distances between them at once) is more accurate, because it uses all the information given. We we will be using intrinisic camera matrix from the first method further on."
-    )
+    # print(cameraMatrix2)
+    # print(distCoeffs2)
+    # print(
+    #     "The results are quite different, the first method(considering all markers and distances between them at once) is more accurate, because it uses all the information given. We we will be using intrinisic camera matrix from the first method further on."
+    # )
 
-    ############## some break #############
-    undistorted_images2 = simpler_calibrating(
-        calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
-    )
-    undistorted_images = []
-    for img in calibration_images:
-        undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
-        undistorted_images.append(undistorted_image)
-        # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
-        # cv2.imshow("undistorted image", undistorted_image)
-        # cv2.waitKey(0)
-    cv2.imshow(
-        "original image", calibration_images[0]
-    )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
-    cv2.imshow("undistorted image", undistorted_images[0])
-    cv2.imshow("undistorted image 2", undistorted_images2[0])
-    # FOR UNDISTORTION IT IS BETTER TO USE CALIBRATECAMERA FOR SINGLE IMAGE AS IT BETTER FITS TO THIS SPECIFIC IMAGE
-    cv2.waitKey(0)
+    # undistorted_images2 = simpler_calibrating(
+    #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
+    # )
+    # undistorted_images = []
+    # for img in calibration_images:
+    #     undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
+    #     undistorted_images.append(undistorted_image)
+    #     # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+    #     # cv2.imshow("undistorted image", undistorted_image)
+    #     # cv2.waitKey(0)
+    # cv2.imshow(
+    #     "original image", calibration_images[0]
+    # )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+    # cv2.imshow("undistorted image", undistorted_images[0])
+    # cv2.imshow("undistorted image 2", undistorted_images2[0])
+    # # FOR UNDISTORTION IT IS BETTER TO USE CALIBRATECAMERA FOR SINGLE IMAGE AS IT BETTER FITS TO THIS SPECIFIC IMAGE
+    # cv2.waitKey(0)
+
+    ######################## TASK 2 ########################
 
 
 if __name__ == "__main__":
