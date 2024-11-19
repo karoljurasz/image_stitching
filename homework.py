@@ -241,17 +241,20 @@ def test_homography():
 
 
 ######################## TASK 4 FUNCTIONS  ########################
+######################## TASK 5 FUNCTIONS  ########################
 
 
 ######################## MAIN FUNCTION  ########################
 
 
 def main():
+
+    calibration_images = [cv2.imread(f"calibration\img{i}.png") for i in range(1, 29)]
+    stitching_images = [cv2.imread(f"stitching\img{i}.png") for i in range(1, 10)]
+    tag_size = 1.68
+    spacing = 0.70
+
     ######################## TASK 1 ########################
-    # calibration_images = [cv2.imread(f"calibration\img{i}.png") for i in range(1, 29)]
-    # stitching_images = [cv2.imread(f"stitching\img{i}.png") for i in range(1, 10)]
-    # tag_size = 1.68
-    # spacing = 0.70
 
     # cameraMatrix, distCoeffs = calibrating(
     #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
@@ -289,10 +292,34 @@ def main():
     # cv2.waitKey(0)
 
     ######################## TASK 2 ########################
-    for i in range(10):
-        test_homography()
-
     ######################## TASK 3 ########################
+    # for i in range(10):
+    #     test_homography()
+
+    ######################## TASK 4 ########################
+    left = stitching_images[0]
+    right = stitching_images[1]
+    # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    # axes[0].imshow(cv2.cvtColor(left, cv2.COLOR_BGR2RGB))
+    # axes[0].set_title("Left Image")
+    # axes[0].axis("on")
+    # axes[1].imshow(cv2.cvtColor(right, cv2.COLOR_BGR2RGB))
+    # axes[1].set_title("Right Image")
+    # axes[1].axis("on")
+    # plt.show()
+
+    left_points = np.array(
+        [[431, 1096], [424, 458], [328, 339], [362, 934], [183, 756], [584, 855]]
+    )
+
+    right_points = np.array(
+        [[440, 1228], [570, 429], [337, 459], [368, 1052], [187, 864], [596, 968]]
+    )
+
+    homography_matrix = find_homography_matrix(left_points.T, right_points.T)
+    print(homography_matrix)
+    final_img = apply_projective_transform(right, left, homography_matrix)
+    #################### TASK 5 ####################
 
 
 if __name__ == "__main__":
