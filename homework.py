@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import unittest
 
 ######################## TASK 1 FUNCTIONS  ########################
 
@@ -77,19 +78,19 @@ def calibrating(calibration_images, tag_size, spacing):
     detector = cv2.aruco.ArucoDetector(dictionary, parameters)
     imgptsf = []
     objptsf = []
+    objpts = object_points(tag_size, spacing)
     shape = (calibration_images[0].shape[1], calibration_images[0].shape[0])
     for img in calibration_images:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = detector.detectMarkers(gray)
         corners = sort_corners(corners, ids)
-        objpts = object_points(tag_size, spacing)
 
-        objptsf.append(objpts)
+        objptsf.append(objpts[0])
         imgptsf.append(corners)
-    _, cameraMatrix, distCoeffs, _, _ = cv2.calibrateCamera(
-        objpts, corners, shape, None, None
+    ret, cameraMatrix, distCoeffs, _, _ = cv2.calibrateCamera(
+        objptsf, imgptsf, shape, None, None
     )
-    return cameraMatrix, distCoeffs
+    return cameraMatrix, distCoeffs, ret
 
 
 def simpler_calibrating(calibration_images, tag_size, spacing):
@@ -107,13 +108,14 @@ def simpler_calibrating(calibration_images, tag_size, spacing):
         corners = sort_corners(corners, ids)
         objpts = object_points(tag_size, spacing)
 
-        objptsf.append(objpts)
+        objptsf.append(objpts[0])
         imgptsf.append(corners)
         _, cameraMatrix, distCoeffs, _, _ = cv2.calibrateCamera(
-            objpts, corners, shape, None, None
+            objptsf, imgptsf, shape, None, None
         )
         undistorted_img = undistort_image(img, cameraMatrix, distCoeffs)
         undistorted_img_2.append(undistorted_img)
+
     return undistorted_img_2
 
 
@@ -121,8 +123,8 @@ def calibrating_6_different(calibration_images, tag_size, spacing):
     dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_16h5)
     parameters = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(dictionary, parameters)
-    objptsf = [[], [], [], [], [], []]
-    imgptsf = [[], [], [], [], [], []]
+    objptsf = []
+    imgptsf = []
     objpts = simpler_object_points(tag_size, spacing)
     for img in calibration_images:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -131,21 +133,13 @@ def calibrating_6_different(calibration_images, tag_size, spacing):
             corners = sort_corners(corners, ids)
             shape = (img.shape[1], img.shape[0])
             for i in range(6):
-                objptsf[i].append(objpts[0])
-                imgptsf[i].append(corners[:, 4 * i : 4 * (i + 1), :])
+                objptsf.append(objpts[0])
+                imgptsf.append(corners[:, 4 * i : 4 * (i + 1), :])
 
-    cameraMatrix = []
-    distCoeffs = []
-    for j in range(6):
-        _, cameraMatrix_, distCoeffs_, _, _ = cv2.calibrateCamera(
-            objptsf[j], imgptsf[j], shape, None, None
-        )
-        cameraMatrix.append(cameraMatrix_)
-        distCoeffs.append(distCoeffs_)
-
-    cameraMatrix = np.mean(cameraMatrix, axis=0)
-    distCoeffs = np.mean(distCoeffs, axis=0)
-    return cameraMatrix, distCoeffs
+    ret, cameraMatrix_, distCoeffs_, _, _ = cv2.calibrateCamera(
+        objptsf, imgptsf, shape, None, None
+    )
+    return cameraMatrix_, distCoeffs_, ret
 
 
 ######################## TASK 2 FUNCTIONS  ########################
@@ -256,22 +250,36 @@ def main():
 
     ######################## TASK 1 ########################
 
-    # cameraMatrix, distCoeffs = calibrating(
-    #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
-    # )
+    cameraMatrix, distCoeffs, ret = calibrating(
+        calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
+    )
 
-    # print(cameraMatrix)
-    # print(distCoeffs)
+    print(cameraMatrix)
+    print(distCoeffs)
 
-    # cameraMatrix2, distCoeffs2 = calibrating_6_different(
-    #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
-    # )
+    ###### testing errors for different methods ######
+    test_img = [
+        calibration_images[5],
+        calibration_images[6],
+        calibration_images[7],
+        calibration_images[8],
+        calibration_images[9],
+        calibration_images[10],
+        calibration_images[11],
+    ]
+    cameraMatrix1, distCoeffs1, ret1 = calibrating(
+        calibration_images=test_img, tag_size=tag_size, spacing=spacing
+    )
+    cameraMatrix2, distCoeffs2, ret2 = calibrating_6_different(
+        calibration_images=test_img, tag_size=tag_size, spacing=spacing
+    )
 
-    # print(cameraMatrix2)
-    # print(distCoeffs2)
-    # print(
-    #     "The results are quite different, the first method(considering all markers and distances between them at once) is more accurate, because it uses all the information given. We we will be using intrinisic camera matrix from the first method further on."
-    # )
+    print(cameraMatrix1)
+    print(distCoeffs1)
+    print(f"normal method with info: {ret1}")
+    print(cameraMatrix2)
+    print(distCoeffs2)
+    print(f"one image 6 times: {ret2}")
 
     # undistorted_images2 = simpler_calibrating(
     #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
@@ -280,9 +288,9 @@ def main():
     # for img in calibration_images:
     #     undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
     #     undistorted_images.append(undistorted_image)
-    #     # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
-    #     # cv2.imshow("undistorted image", undistorted_image)
-    #     # cv2.waitKey(0)
+    # #     # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+    # #     # cv2.imshow("undistorted image", undistorted_image)
+    # #     # cv2.waitKey(0)
     # cv2.imshow(
     #     "original image", calibration_images[0]
     # )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
@@ -297,28 +305,28 @@ def main():
     #     test_homography()
 
     ######################## TASK 4 ########################
-    left = stitching_images[0]
-    right = stitching_images[1]
-    # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    # axes[0].imshow(cv2.cvtColor(left, cv2.COLOR_BGR2RGB))
-    # axes[0].set_title("Left Image")
-    # axes[0].axis("on")
-    # axes[1].imshow(cv2.cvtColor(right, cv2.COLOR_BGR2RGB))
-    # axes[1].set_title("Right Image")
-    # axes[1].axis("on")
-    # plt.show()
+    # left = stitching_images[0]
+    # right = stitching_images[1]
+    # # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    # # axes[0].imshow(cv2.cvtColor(left, cv2.COLOR_BGR2RGB))
+    # # axes[0].set_title("Left Image")
+    # # axes[0].axis("on")
+    # # axes[1].imshow(cv2.cvtColor(right, cv2.COLOR_BGR2RGB))
+    # # axes[1].set_title("Right Image")
+    # # axes[1].axis("on")
+    # # plt.show()
 
-    left_points = np.array(
-        [[431, 1096], [424, 458], [328, 339], [362, 934], [183, 756], [584, 855]]
-    )
+    # left_points = np.array(
+    #     [[431, 1096], [424, 458], [328, 339], [362, 934], [183, 756], [584, 855]]
+    # )
 
-    right_points = np.array(
-        [[440, 1228], [570, 429], [337, 459], [368, 1052], [187, 864], [596, 968]]
-    )
+    # right_points = np.array(
+    #     [[440, 1228], [570, 429], [337, 459], [368, 1052], [187, 864], [596, 968]]
+    # )
 
-    homography_matrix = find_homography_matrix(left_points.T, right_points.T)
-    print(homography_matrix)
-    final_img = apply_projective_transform(right, left, homography_matrix)
+    # homography_matrix = find_homography_matrix(left_points.T, right_points.T)
+    # print(homography_matrix)
+    # final_img = apply_projective_transform(right, left, homography_matrix)
     #################### TASK 5 ####################
 
 
