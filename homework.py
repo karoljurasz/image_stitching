@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import unittest
+
 
 ######################## TASK 1 FUNCTIONS  ########################
 
@@ -143,49 +143,94 @@ def calibrating_6_different(calibration_images, tag_size, spacing):
 
 
 ######################## TASK 2 FUNCTIONS  ########################
+def get_1nn_pixel(approximate_pixel_coordinates):
+    # the np.round() rounds to a nearest pixel_coordinates in L1 norm
+    return np.round(approximate_pixel_coordinates).astype(int)
 
 
-def apply_projective_transform(
-    source_image, destination_image, projective_transformation_matrix
-):
-    h, w = destination_image.shape[:2]
-    inv_matrix = np.linalg.inv(projective_transformation_matrix)
-    transformed_image = np.zeros_like(destination_image)
+def projective_transform(source, H):
+    inverse_H = np.linalg.inv(H)
+    source_pixels = (
+        np.dstack(np.meshgrid(np.arange(source.shape[1]), np.arange(source.shape[0])))
+        .reshape(-1, 2)
+        .T
+    )
+    # source pixels in homogeneous coordinates
+    source_pixels = np.vstack((source_pixels, np.ones((1, source_pixels.shape[1]))))
 
-    for y in range(h):
-        for x in range(w):
-            src_coords = inv_matrix @ np.array([x, y, 1])
-            src_x, src_y = src_coords[:2] / src_coords[2]
-            src_x, src_y = int(round(src_x)), int(round(src_y))
+    part_of_destination_points = H @ source_pixels
+    part_of_destination_points = (
+        part_of_destination_points / part_of_destination_points[2, :]
+    )
 
-            if (
-                0 <= src_x < source_image.shape[1]
-                and 0 <= src_y < source_image.shape[0]
-            ):
-                transformed_image[y, x] = source_image[src_y, src_x]
+    destination_begining = np.floor(np.min(part_of_destination_points, axis=1))[
+        :2
+    ].astype(int)
+    destination_begining[0], destination_begining[1] = (
+        destination_begining[1],
+        destination_begining[0],
+    )
+    destination_end = np.ceil(np.max(part_of_destination_points, axis=1))[:2].astype(
+        int
+    )
+    destination_end[0], destination_end[1] = destination_end[1], destination_end[0]
 
-    final_image = np.zeros_like(destination_image)
-    for y in range(h):
-        for x in range(w):
-            dst_coords = projective_transformation_matrix @ np.array([x, y, 1])
-            dst_x, dst_y = dst_coords[:2] / dst_coords[2]
-            dst_x, dst_y = int(round(dst_x)), int(round(dst_y))
+    destination_img_shape = np.array(
+        list(destination_end - destination_begining + 1) + [3]
+    )
+    destination_pixels = (
+        np.dstack(
+            np.meshgrid(
+                np.arange(
+                    destination_begining[1], destination_end[1] + 1, dtype=np.int32
+                ),
+                np.arange(
+                    destination_begining[0], destination_end[0] + 1, dtype=np.int32
+                ),
+            )
+        )
+        .reshape(-1, 2)
+        .T
+    )
+    destination_pixels = np.vstack(
+        [destination_pixels, np.ones((1, destination_pixels.shape[1]))]
+    ).astype(np.int32)
 
-            if (
-                0 <= dst_x < destination_image.shape[1]
-                and 0 <= dst_y < destination_image.shape[0]
-            ):
-                final_image[dst_y, dst_x] = transformed_image[y, x]
-            else:
-                final_image[y, x] = [0, 0, 0]  # Make the square black if out of image
+    destination_img = np.zeros(destination_img_shape, dtype=np.uint8)
 
-    # Display the original and transformed images
-    cv2.imshow("Original Image", source_image)
-    cv2.imshow("Transformed Image", final_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    source_pixels = source_pixels[:2].astype(int)
+    part_of_destination_points = part_of_destination_points[:2]
 
-    return final_image
+    mask = np.ones(destination_img_shape[:2], dtype=np.bool_)
+
+    # more robust version with using inverse transformation and 1nn
+    for dp in destination_pixels.T:
+        sp = inverse_H @ dp
+        sp = sp / sp[2]
+        sp = sp[:2]
+        sp = get_1nn_pixel(sp)
+
+        dimg_index = (dp[0] - destination_begining[1], dp[1] - destination_begining[0])
+        if (
+            sp[0] < 0
+            or sp[0] >= source.shape[1]
+            or sp[1] < 0
+            or sp[1] >= source.shape[0]
+        ):
+            mask[dimg_index[1], dimg_index[0]] = 0
+        else:
+            destination_img[dimg_index[1], dimg_index[0]] = source[sp[1], sp[0]]
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    axes[0].imshow(cv2.cvtColor(source, cv2.COLOR_BGR2RGB))
+    axes[0].set_title("Original Image")
+    axes[0].axis("on")
+    axes[1].imshow(cv2.cvtColor(destination_img, cv2.COLOR_BGR2RGB))
+    axes[1].set_title("Transformed Image")
+    axes[1].axis("on")
+    plt.show()
+
+    return destination_img
 
 
 ######################## TASK 3 FUNCTIONS  ########################
@@ -203,6 +248,7 @@ def find_homography_matrix(source, destination):
     _, _, V = np.linalg.svd(A)
     matrix = V[-1, :].reshape(3, 3)
     matrix = matrix / matrix[2, 2]
+    matrix = np.array(matrix)
     return matrix
 
 
@@ -250,36 +296,36 @@ def main():
 
     ######################## TASK 1 ########################
 
-    cameraMatrix, distCoeffs, ret = calibrating(
-        calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
-    )
+    # cameraMatrix, distCoeffs, ret = calibrating(
+    #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
+    # )
 
-    print(cameraMatrix)
-    print(distCoeffs)
+    # print(cameraMatrix)
+    # print(distCoeffs)
 
-    ###### testing errors for different methods ######
-    test_img = [
-        calibration_images[5],
-        calibration_images[6],
-        calibration_images[7],
-        calibration_images[8],
-        calibration_images[9],
-        calibration_images[10],
-        calibration_images[11],
-    ]
-    cameraMatrix1, distCoeffs1, ret1 = calibrating(
-        calibration_images=test_img, tag_size=tag_size, spacing=spacing
-    )
-    cameraMatrix2, distCoeffs2, ret2 = calibrating_6_different(
-        calibration_images=test_img, tag_size=tag_size, spacing=spacing
-    )
+    # ###### testing errors for different methods ######
+    # test_img = [
+    #     calibration_images[5],
+    #     calibration_images[6],
+    #     calibration_images[7],
+    #     calibration_images[8],
+    #     calibration_images[9],
+    #     calibration_images[10],
+    #     calibration_images[11],
+    # ]
+    # cameraMatrix1, distCoeffs1, ret1 = calibrating(
+    #     calibration_images=test_img, tag_size=tag_size, spacing=spacing
+    # )
+    # cameraMatrix2, distCoeffs2, ret2 = calibrating_6_different(
+    #     calibration_images=test_img, tag_size=tag_size, spacing=spacing
+    # )
 
-    print(cameraMatrix1)
-    print(distCoeffs1)
-    print(f"normal method with info: {ret1}")
-    print(cameraMatrix2)
-    print(distCoeffs2)
-    print(f"one image 6 times: {ret2}")
+    # print(cameraMatrix1)
+    # print(distCoeffs1)
+    # print(f"normal method with info: {ret1}")
+    # print(cameraMatrix2)
+    # print(distCoeffs2)
+    # print(f"one image 6 times: {ret2}")
 
     # undistorted_images2 = simpler_calibrating(
     #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
@@ -305,29 +351,49 @@ def main():
     #     test_homography()
 
     ######################## TASK 4 ########################
-    # left = stitching_images[0]
-    # right = stitching_images[1]
-    # # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    # # axes[0].imshow(cv2.cvtColor(left, cv2.COLOR_BGR2RGB))
-    # # axes[0].set_title("Left Image")
-    # # axes[0].axis("on")
-    # # axes[1].imshow(cv2.cvtColor(right, cv2.COLOR_BGR2RGB))
-    # # axes[1].set_title("Right Image")
-    # # axes[1].axis("on")
-    # # plt.show()
+    left = stitching_images[0]
+    right = stitching_images[1]
+    # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    # axes[0].imshow(cv2.cvtColor(left, cv2.COLOR_BGR2RGB))
+    # axes[0].set_title("Left Image")
+    # axes[0].axis("on")
+    # axes[1].imshow(cv2.cvtColor(right, cv2.COLOR_BGR2RGB))
+    # axes[1].set_title("Right Image")
+    # axes[1].axis("on")
+    # plt.show()
 
     # left_points = np.array(
     #     [[431, 1096], [424, 458], [328, 339], [362, 934], [183, 756], [584, 855]]
     # )
 
     # right_points = np.array(
-    #     [[440, 1228], [570, 429], [337, 459], [368, 1052], [187, 864], [596, 968]]
+    #     [[440, 1228], [429, 570], [337, 459], [368, 1052], [187, 864], [596, 968]]
     # )
+    left_points = np.array(
+        [[1096, 431], [458, 424], [339, 328], [934, 362], [756, 183], [855, 584]]
+    )
 
-    # homography_matrix = find_homography_matrix(left_points.T, right_points.T)
-    # print(homography_matrix)
-    # final_img = apply_projective_transform(right, left, homography_matrix)
-    #################### TASK 5 ####################
+    right_points = np.array(
+        [[1228, 440], [570, 429], [459, 337], [1052, 368], [864, 187], [968, 596]]
+    )
+    # for point in left_points:
+    #     cv2.circle(left, tuple(point), 5, (0, 0, 255), -1)
+    # for point in right_points:
+    #     cv2.circle(right, tuple(point), 5, (0, 0, 255), -1)
+
+    # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    # axes[0].imshow(cv2.cvtColor(left, cv2.COLOR_BGR2RGB))
+    # axes[0].set_title("Left Image")
+    # axes[0].axis("on")
+    # axes[1].imshow(cv2.cvtColor(right, cv2.COLOR_BGR2RGB))
+    # axes[1].set_title("Right Image")
+    # axes[1].axis("on")
+    # plt.show()
+
+    homography_matrix = find_homography_matrix(left_points.T, right_points.T)
+    print(homography_matrix)
+    final_img = projective_transform(left, homography_matrix)
+    ################### TASK 5 ####################
 
 
 if __name__ == "__main__":
