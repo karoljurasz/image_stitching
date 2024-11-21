@@ -312,6 +312,7 @@ def some_dynamic_seam(image, base, H):
     base = base[y_min:y_max, x_min:x_max]
 
     h, w = image.shape[:2]
+
     cost_table = np.zeros((h, w))
 
     # Calculate the initial cost for the first row
@@ -421,9 +422,7 @@ def stich_images(image, base, seam, destination_begining, destination_end):
     )
 
     final_img = np.zeros(shape=final_img_shape)
-    print(final_img.shape)
-    print(image_beg_coords, image_end_coords)
-    print(base_beg_coords, base_end_coords)
+
     final_img[
         image_beg_coords[0] : image_end_coords[0],
         image_beg_coords[1] : image_end_coords[1],
@@ -433,6 +432,30 @@ def stich_images(image, base, seam, destination_begining, destination_end):
         base_beg_coords[0] : base_end_coords[0],
         base_beg_coords[1] : base_end_coords[1],
     ] = base
+
+    ##### now fix the overlapping area according to the seam
+    overlapping_img = image[
+        y_min + shift[0] : y_max + shift[0], x_min + shift[1] : x_max + shift[1]
+    ]
+
+    # ovarlapping_base = base[y_min:y_max, x_min:x_max]
+    # Check wchich image is on the left
+    img_on_the_left = x_min == 0
+    if img_on_the_left:
+        for i in range(len(seam)):
+            final_img[
+                y_min + shift[0] + i,
+                base_beg_coords[1] : base_beg_coords[1] + seam[i][1],
+            ] = overlapping_img[i, -seam[i][1] :]
+    else:
+        for i in range(len(seam)):
+            final_img[
+                y_min + shift[0] + i,
+                image_beg_coords[1] + seam[i][1] : base_end_coords[1],
+            ] = overlapping_img[
+                i, seam[i][1] : base_end_coords[1] - image_beg_coords[1]
+            ]
+
     return final_img.astype(np.uint8)
 
 
@@ -575,7 +598,7 @@ def main():
     # plt.show()
 
     seam = some_dynamic_seam(left, right, homography_matrix)
-    print(seam)
+    # print(seam)
 
     final_img = stich_images(final_img, right, seam, beg, end)
 
