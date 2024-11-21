@@ -148,7 +148,7 @@ def get_1nn_pixel(approximate_pixel_coordinates):
     return np.round(approximate_pixel_coordinates).astype(int)
 
 
-def projective_transform(source, H):
+def projective_transform(source, H, display=True):
     inverse_H = np.linalg.inv(H)
     source_pixels = (
         np.dstack(np.meshgrid(np.arange(source.shape[1]), np.arange(source.shape[0])))
@@ -220,17 +220,17 @@ def projective_transform(source, H):
             mask[dimg_index[1], dimg_index[0]] = 0
         else:
             destination_img[dimg_index[1], dimg_index[0]] = source[sp[1], sp[0]]
+    if display == True:
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+        axes[0].imshow(cv2.cvtColor(source, cv2.COLOR_BGR2RGB))
+        axes[0].set_title("Original Image")
+        axes[0].axis("on")
+        axes[1].imshow(cv2.cvtColor(destination_img, cv2.COLOR_BGR2RGB))
+        axes[1].set_title("Transformed Image")
+        axes[1].axis("on")
+        plt.show()
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    axes[0].imshow(cv2.cvtColor(source, cv2.COLOR_BGR2RGB))
-    axes[0].set_title("Original Image")
-    axes[0].axis("on")
-    axes[1].imshow(cv2.cvtColor(destination_img, cv2.COLOR_BGR2RGB))
-    axes[1].set_title("Transformed Image")
-    axes[1].axis("on")
-    plt.show()
-
-    return destination_img
+    return destination_img, mask, destination_begining, destination_end
 
 
 ######################## TASK 3 FUNCTIONS  ########################
@@ -282,6 +282,158 @@ def test_homography():
 
 ######################## TASK 4 FUNCTIONS  ########################
 ######################## TASK 5 FUNCTIONS  ########################
+
+
+def find_overlapping_area_and_shift(destination_begining, destination_end, base):
+    # _, _, destination_begining, destination_end = projective_transform(
+    #     image, H, display=False
+    # )
+    x_min, y_min = max(0, destination_begining[1]), max(0, destination_begining[0])
+    x_max, y_max = min(base.shape[1], destination_end[1]), min(
+        base.shape[0], destination_end[0]
+    )
+    shift = [-destination_begining[0], -destination_begining[1]]
+    return x_min, y_min, x_max, y_max, shift
+
+
+def some_dynamic_seam(image, base, H):
+    img, _, destination_begining, destination_end = projective_transform(
+        image, H, display=False
+    )
+    image = img
+
+    x_min, y_min, x_max, y_max, shift = find_overlapping_area_and_shift(
+        destination_begining, destination_end, base
+    )
+
+    image = image[
+        y_min + shift[0] : y_max + shift[0], x_min + shift[1] : x_max + shift[1]
+    ]
+    base = base[y_min:y_max, x_min:x_max]
+
+    h, w = image.shape[:2]
+    cost_table = np.zeros((h, w))
+
+    # Calculate the initial cost for the first row
+    for j in range(w):
+        diff = np.abs(image[0, j] - base[0, j])
+        grayscale_diff = 0.3 * diff[0] + 0.59 * diff[1] + 0.11 * diff[1]
+        cost_table[0, j] = grayscale_diff**2
+
+    # Fill the cost table using dynamic programming
+    for i in range(1, h):
+        for j in range(w):
+            diff = np.abs(image[i, j] - base[i, j])
+            grayscale_diff = 0.3 * diff[0] + 0.59 * diff[1] + 0.11 * diff[2]
+            cost = grayscale_diff**2
+
+            if j == 0:
+                cost_table[i, j] = cost + min(
+                    cost_table[i - 1, j], cost_table[i - 1, j + 1]
+                )
+            elif j == w - 1:
+                cost_table[i, j] = cost + min(
+                    cost_table[i - 1, j - 1], cost_table[i - 1, j]
+                )
+            else:
+                cost_table[i, j] = cost + min(
+                    cost_table[i - 1, j - 1],
+                    cost_table[i - 1, j],
+                    cost_table[i - 1, j + 1],
+                )
+
+    # Backtrack to find the optimal seam
+    seam = []
+    min_cost_index = int(np.argmin(cost_table[-1, :]))
+    seam.append((h - 1, min_cost_index))
+
+    for i in range(h - 2, -1, -1):
+        j = seam[-1][1]
+        if j == 0:
+            min_cost_index = int(np.argmin(cost_table[i, j : j + 2]))
+            seam.append((i, j + min_cost_index))
+        elif j == w - 1:
+            min_cost_index = int(np.argmin(cost_table[i, j - 1 : j + 1]))
+            seam.append((i, j - 1 + min_cost_index))
+        else:
+            min_cost_index = int(np.argmin(cost_table[i, j - 1 : j + 2]))
+            seam.append((i, j - 1 + min_cost_index))
+
+    seam.reverse()
+    return seam
+
+
+def get_final_image_shape_and_coordinates_of_images(
+    destination_begining, destination_end, base
+):
+    x_min, y_min, x_max, y_max, shift = find_overlapping_area_and_shift(
+        destination_begining, destination_end, base
+    )
+    h, w = base.shape[:2]
+    len_a = max(destination_end[1], w) - min(destination_begining[1], 0) + 1
+    len_b = max(destination_end[0], h) - min(destination_begining[0], 0) + 1
+    image_beg_coords = (
+        max(0, destination_begining[0]),
+        max(0, destination_begining[1]),
+    )
+    image_end_coords = (
+        image_beg_coords[0] + destination_end[0] - destination_begining[0] + 1,
+        image_beg_coords[1] + destination_end[1] - destination_begining[1] + 1,
+    )
+    if destination_begining[0] != 0:
+        base_beg_coords1 = 0
+        base_end_coords1 = h
+    else:
+        base_beg_coords1 = y_min
+        base_end_coords1 = y_min + h
+
+    if destination_begining[1] != 0:
+        base_beg_coords2 = 0
+        base_end_coords2 = w
+    else:
+        base_beg_coords2 = x_min
+        base_end_coords2 = x_min + w
+    base_beg_coords = (base_beg_coords1, base_beg_coords2)
+    base_end_coords = (base_end_coords1, base_end_coords2)
+    final_img_shape = (len_b, len_a, 3)
+    return (
+        final_img_shape,
+        image_beg_coords,
+        image_end_coords,
+        base_beg_coords,
+        base_end_coords,
+    )
+
+
+def stich_images(image, base, seam, destination_begining, destination_end):
+    x_min, y_min, x_max, y_max, shift = find_overlapping_area_and_shift(
+        destination_begining, destination_end, base
+    )
+
+    (
+        final_img_shape,
+        image_beg_coords,
+        image_end_coords,
+        base_beg_coords,
+        base_end_coords,
+    ) = get_final_image_shape_and_coordinates_of_images(
+        destination_begining, destination_end, base
+    )
+
+    final_img = np.zeros(shape=final_img_shape)
+    print(final_img.shape)
+    print(image_beg_coords, image_end_coords)
+    print(base_beg_coords, base_end_coords)
+    final_img[
+        image_beg_coords[0] : image_end_coords[0],
+        image_beg_coords[1] : image_end_coords[1],
+        :,
+    ] = image
+    final_img[
+        base_beg_coords[0] : base_end_coords[0],
+        base_beg_coords[1] : base_end_coords[1],
+    ] = base
+    return final_img.astype(np.uint8)
 
 
 ######################## MAIN FUNCTION  ########################
@@ -362,7 +514,7 @@ def main():
     # axes[1].axis("on")
     # plt.show()
 
-    # left_points = np.array(
+    # left_points_t = np.array(
     #     [[431, 1096], [424, 458], [328, 339], [362, 934], [183, 756], [584, 855]]
     # )
 
@@ -389,10 +541,47 @@ def main():
     # axes[1].set_title("Right Image")
     # axes[1].axis("on")
     # plt.show()
-
+    #### Test for good transformation
     homography_matrix = find_homography_matrix(left_points.T, right_points.T)
     print(homography_matrix)
-    final_img = projective_transform(left, homography_matrix)
+    # final_img, _,_,_ = projective_transform(left, homography_matrix, display=True)
+
+    #### Test for good projection
+    # final_img, _, _, _ = projective_transform(left, homography_matrix, display=False)
+    # left_points_projected = get_pixel_coordinates_on_new_image_plane_yx(
+    #     homography_matrix, left_points_t, [0, 0]
+    # )
+    # print(left_points_projected)
+    # for point in left_points_projected:
+    #     cv2.circle(final_img, tuple(point), 5, (0, 0, 255), -1)
+
+    # plt.imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
+    # plt.show()
+
+    ########## Looking on projection to compare overlapping area
+    final_img, _, beg, end = projective_transform(
+        left, homography_matrix, display=False
+    )
+    # print(beg, end)
+    # x_min, y_min, x_max, y_max, shift = find_overlapping_area_and_shift(beg, end, right)
+    # print(x_min, y_min, x_max, y_max)
+    # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    # axes[0].imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
+    # axes[0].set_title("Projected Image")
+    # axes[0].axis("on")
+    # axes[1].imshow(cv2.cvtColor(right, cv2.COLOR_BGR2RGB))
+    # axes[1].set_title("Base Image")
+    # axes[1].axis("on")
+    # plt.show()
+
+    seam = some_dynamic_seam(left, right, homography_matrix)
+    print(seam)
+
+    final_img = stich_images(final_img, right, seam, beg, end)
+
+    plt.imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
+    plt.show()
+
     ################### TASK 5 ####################
 
 
