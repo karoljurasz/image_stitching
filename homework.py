@@ -381,19 +381,19 @@ def get_final_image_shape_and_coordinates_of_images(
         image_beg_coords[0] + destination_end[0] - destination_begining[0] + 1,
         image_beg_coords[1] + destination_end[1] - destination_begining[1] + 1,
     )
-    if destination_begining[0] != 0:
+    if destination_begining[0] > 0:
         base_beg_coords1 = 0
         base_end_coords1 = h
     else:
-        base_beg_coords1 = y_min
-        base_end_coords1 = y_min + h
+        base_beg_coords1 = -destination_begining[0]
+        base_end_coords1 = -destination_begining[0] + h
 
-    if destination_begining[1] != 0:
+    if destination_begining[1] > 0:
         base_beg_coords2 = 0
         base_end_coords2 = w
     else:
-        base_beg_coords2 = x_min
-        base_end_coords2 = x_min + w
+        base_beg_coords2 = -destination_begining[1]
+        base_end_coords2 = -destination_begining[1] + w
     base_beg_coords = (base_beg_coords1, base_beg_coords2)
     base_end_coords = (base_end_coords1, base_end_coords2)
     final_img_shape = (len_b, len_a, 3)
@@ -440,31 +440,44 @@ def stich_images(image, base, seam, destination_begining, destination_end):
 
     # ovarlapping_base = base[y_min:y_max, x_min:x_max]
     # Check wchich image is on the left
+    print(image_beg_coords, base_beg_coords)
+    print(image_end_coords, base_end_coords)
     img_on_the_left = x_min == 0
     if img_on_the_left:
-        for i in range(len(seam)):
+        for i in range(len(seam)):  # max(image_beg_coords[0], base_beg_coords[0])
             final_img[
-                y_min + shift[0] + i,
+                max(image_beg_coords[0], base_beg_coords[0]) + i,
                 base_beg_coords[1] : base_beg_coords[1] + seam[i][1],
-            ] = overlapping_img[i, -seam[i][1] :]
-            # final_img[y_min + shift[0] + i, base_beg_coords[1] + seam[i][1]] = [
+            ] = overlapping_img[i, : seam[i][1]]
+            # # checking the sewing line
+            # final_img[
+            #     max(image_beg_coords[0], base_beg_coords[0]) + i,
+            #     base_beg_coords[1] + seam[i][1],
+            # ] = [
             #     0,
             #     240,
             #     0,
-            # ]  # just checking the sewing line
+            # ]
+            # # end of checking the sewing line
     else:
         for i in range(len(seam)):
             final_img[
-                y_min + shift[0] + i,
+                max(image_beg_coords[0], base_beg_coords[0]) + i,
                 image_beg_coords[1] + seam[i][1] : base_end_coords[1],
             ] = overlapping_img[
-                i, seam[i][1] : base_end_coords[1] - image_beg_coords[1]
+                i, seam[i][1] :  # base_end_coords[1] - image_beg_coords[1]
             ]
-            # final_img[y_min + shift[0] + i, image_beg_coords[1] + seam[i][1] - 1] = [
+
+            # #  checking the sewing line
+            # final_img[
+            #     max(image_beg_coords[0], base_beg_coords[0]) + i,
+            #     image_beg_coords[1] + seam[i][1] - 1,
+            # ] = [
             #     0,
             #     240,
             #     0,
-            # ]  # just checking the sewing line
+            # ]
+            # # end of checking the sewing line
     return final_img.astype(np.uint8)
 
 
@@ -594,9 +607,9 @@ def main():
     # plt.show()
 
     ########## Looking on projection to compare overlapping area
-    final_img, _, beg, end = projective_transform(
-        left, homography_matrix, display=False
-    )
+    # final_img, _, beg, end = projective_transform(
+    #     left, homography_matrix, display=False
+    # )
     # print(beg, end)
     # x_min, y_min, x_max, y_max, shift = find_overlapping_area_and_shift(beg, end, right)
     # print(x_min, y_min, x_max, y_max)
@@ -608,16 +621,60 @@ def main():
     # axes[1].set_title("Base Image")
     # axes[1].axis("on")
     # plt.show()
+    ######################## TASK 5 ########################
+    # left = stitching_images[0]
+    # right = stitching_images[1]
+    # left_points = np.array(
+    #     [[1096, 431], [458, 424], [339, 328], [934, 362], [756, 183], [855, 584]]
+    # )
 
-    seam = some_dynamic_seam(left, right, homography_matrix)
-    # print(seam)
+    # right_points = np.array(
+    #     [[1228, 440], [570, 429], [459, 337], [1052, 368], [864, 187], [968, 596]]
+    # )
+    # homography_matrix = find_homography_matrix(left_points.T, right_points.T)
+    # final_img, _, beg, end = projective_transform(
+    #     left, homography_matrix, display=False
+    # )
+    # seam = some_dynamic_seam(left, right, homography_matrix)
+    # # print(seam)
 
-    final_img = stich_images(final_img, right, seam, beg, end)
+    # final_img = stich_images(final_img, right, seam, beg, end)
 
-    plt.imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
+    # plt.imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
+    # plt.show()
+    # cv2.imwrite("task_5_stitched.jpg", final_img)
+
+    ################### TASK 6 ####################
+    ## After preapring proper folders i want to use this command in cmd:
+    ## python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_6/ --input_pairs stitching_pairs_task_6.txt --output_dir matching_pairs --viz
+    # #in my folder I want to have img2(as base) and img1 and then do some standard things as I read file with matches, find homography and stitch images
+
+    # npz = np.load("matching_pairs/img1_img2_matches.npz")
+    # left_points = npz["keypoints0"]
+    # new_left_points = []
+    # right_points = []
+    # for i in range(len(left_points)):
+    #     if npz["matches"][i] != -1:
+    #         right_points.append(npz["keypoints1"][npz["matches"][i]])
+    #         new_left_points.append(left_points[i])
+
+    # left_points = np.array(new_left_points)
+    # right_points = np.array(right_points)
+
+    # homography_matrix = find_homography_matrix(left_points.T, right_points.T)
+    # final_img, _, beg, end = projective_transform(
+    #     left, homography_matrix, display=False
+    # )
+    # seam = some_dynamic_seam(left, right, homography_matrix)
+    # final_img = stich_images(final_img, right, seam, beg, end)
+    # plt.imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
+    # plt.show()
+    # cv2.imwrite("task_6_stitched.jpg", final_img)
+
+    ######################## TASK 7 ########################
+    current_image = cv2.imread("task_6_stitched.jpg")
+    plt.imshow(cv2.cvtColor(current_image, cv2.COLOR_BGR2RGB))
     plt.show()
-
-    ################### TASK 5 ####################
 
 
 if __name__ == "__main__":
