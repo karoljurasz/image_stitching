@@ -468,6 +468,9 @@ def stich_images(image, base, seam, destination_begining, destination_end):
     return final_img.astype(np.uint8)
 
 
+########### TASK 6 FUNCTIONS ############
+
+
 ######################## MAIN FUNCTION  ########################
 
 
