@@ -325,8 +325,8 @@ def some_dynamic_seam(image, base, H):
     for i in range(1, h):
         for j in range(w):
             diff = np.abs(image[i, j] - base[i, j])
-            grayscale_diff = 0.3 * diff[0] + 0.59 * diff[1] + 0.11 * diff[2]
-            cost = grayscale_diff**2
+            grayscale_diff = 0.11 * diff[0] + 0.59 * diff[1] + 0.3 * diff[2]
+            cost = np.sqrt(grayscale_diff)
 
             if j == 0:
                 cost_table[i, j] = cost + min(
@@ -447,6 +447,11 @@ def stich_images(image, base, seam, destination_begining, destination_end):
                 y_min + shift[0] + i,
                 base_beg_coords[1] : base_beg_coords[1] + seam[i][1],
             ] = overlapping_img[i, -seam[i][1] :]
+            # final_img[y_min + shift[0] + i, base_beg_coords[1] + seam[i][1]] = [
+            #     0,
+            #     240,
+            #     0,
+            # ]  # just checking the sewing line
     else:
         for i in range(len(seam)):
             final_img[
@@ -455,7 +460,11 @@ def stich_images(image, base, seam, destination_begining, destination_end):
             ] = overlapping_img[
                 i, seam[i][1] : base_end_coords[1] - image_beg_coords[1]
             ]
-
+            # final_img[y_min + shift[0] + i, image_beg_coords[1] + seam[i][1] - 1] = [
+            #     0,
+            #     240,
+            #     0,
+            # ]  # just checking the sewing line
     return final_img.astype(np.uint8)
 
 
