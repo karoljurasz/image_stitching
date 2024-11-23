@@ -266,7 +266,8 @@ def generate_random_points(num_points=100, range_min=0, range_max=100):
 
 
 def test_homography():
-    np.set_printoptions(precision=18, suppress=True)
+    ## uncheck next line to change results visualisation
+    # np.set_printoptions(precision=18, suppress=True)
     source = generate_random_points()
     random_matrix = get_random_homography()
     source_homogeneous = np.vstack([source, np.ones((1, source.shape[1]))])
@@ -433,18 +434,15 @@ def stich_images(image, base, seam, destination_begining, destination_end):
         base_beg_coords[1] : base_end_coords[1],
     ] = base
 
-    ##### now fix the overlapping area according to the seam
     overlapping_img = image[
         y_min + shift[0] : y_max + shift[0], x_min + shift[1] : x_max + shift[1]
     ]
 
-    # ovarlapping_base = base[y_min:y_max, x_min:x_max]
-    # Check wchich image is on the left
-    print(image_beg_coords, base_beg_coords)
-    print(image_end_coords, base_end_coords)
+    # Check which image is on the left
+
     img_on_the_left = x_min == 0
     if img_on_the_left:
-        for i in range(len(seam)):  # max(image_beg_coords[0], base_beg_coords[0])
+        for i in range(len(seam)):
             final_img[
                 max(image_beg_coords[0], base_beg_coords[0]) + i,
                 base_beg_coords[1] : base_beg_coords[1] + seam[i][1],
@@ -498,8 +496,6 @@ def RANSAC_find_homography_matrix(
     source, destination, n_interations, n_drop, epsilon=1e-3
 ):
     N = len(source[0])
-    print(N)
-    print(N - n_drop)
 
     indexes = np.arange(N)
     best_number_of_inliers = 0
@@ -514,7 +510,6 @@ def RANSAC_find_homography_matrix(
         H = find_homography_matrix(source_sample, destination_sample)
         error = quantify_error(H, source.reshape(2, -1), destination.reshape(2, -1))
         number_of_inliers = np.sum(error < epsilon)
-        print(number_of_inliers, best_number_of_inliers)
         if number_of_inliers > best_number_of_inliers:
             best_number_of_inliers = number_of_inliers
             best_H = H
@@ -528,6 +523,7 @@ def RANSAC_find_homography_matrix(
 
 def main():
 
+    ## don't comment this part
     calibration_images = [cv2.imread(f"calibration\img{i}.png") for i in range(1, 29)]
     stitching_images = [cv2.imread(f"stitching\img{i}.png") for i in range(1, 10)]
     tag_size = 1.68
@@ -538,7 +534,7 @@ def main():
     # cameraMatrix, distCoeffs, ret = calibrating(
     #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
     # )
-
+    # ####checking the results
     # print(cameraMatrix)
     # print(distCoeffs)
 
@@ -559,12 +555,9 @@ def main():
     #     calibration_images=test_img, tag_size=tag_size, spacing=spacing
     # )
 
-    # print(cameraMatrix1)
-    # print(distCoeffs1)
-    # print(f"normal method with info: {ret1}")
-    # print(cameraMatrix2)
-    # print(distCoeffs2)
-    # print(f"one image 6 times: {ret2}")
+    # print(f"normal method with spacing info error: {ret1}")
+
+    # print(f"one image 6 times error: {ret2}")
 
     # undistorted_images2 = simpler_calibrating(
     #     calibration_images=calibration_images, tag_size=tag_size, spacing=spacing
@@ -573,16 +566,14 @@ def main():
     # for img in calibration_images:
     #     undistorted_image = undistort_image(img, cameraMatrix, distCoeffs)
     #     undistorted_images.append(undistorted_image)
-    # #     # cv2.imshow("original image", img)   #WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
-    # #     # cv2.imshow("undistorted image", undistorted_image)
-    # #     # cv2.waitKey(0)
-    # cv2.imshow(
-    #     "original image", calibration_images[0]
-    # )  # WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+
+    # ## WE CAN SHOW THE IMAGES TO SEE THE DIFFERENCE
+    # cv2.imshow("original image", calibration_images[0])
     # cv2.imshow("undistorted image", undistorted_images[0])
     # cv2.imshow("undistorted image 2", undistorted_images2[0])
-    # # FOR UNDISTORTION IT IS BETTER TO USE CALIBRATECAMERA FOR SINGLE IMAGE AS IT BETTER FITS TO THIS SPECIFIC IMAGE
     # cv2.waitKey(0)
+
+    ##folders with undistorted images: undistorted_images, undistorted_images2
 
     ######################## TASK 2 ########################
     ######################## TASK 3 ########################
@@ -590,8 +581,14 @@ def main():
     #     test_homography()
 
     ######################## TASK 4 ########################
+
+    ## images I compare
+
     left = stitching_images[0]
     right = stitching_images[1]
+
+    ## Plots section 1 - display images to find corresponding points
+
     # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
     # axes[0].imshow(cv2.cvtColor(left, cv2.COLOR_BGR2RGB))
     # axes[0].set_title("Left Image")
@@ -601,13 +598,8 @@ def main():
     # axes[1].axis("on")
     # plt.show()
 
-    # left_points_t = np.array(
-    #     [[431, 1096], [424, 458], [328, 339], [362, 934], [183, 756], [584, 855]]
-    # )
+    ## found these corresponding points:
 
-    # right_points = np.array(
-    #     [[440, 1228], [429, 570], [337, 459], [368, 1052], [187, 864], [596, 968]]
-    # )
     left_points = np.array(
         [[1096, 431], [458, 424], [339, 328], [934, 362], [756, 183], [855, 584]]
     )
@@ -615,6 +607,9 @@ def main():
     right_points = np.array(
         [[1228, 440], [570, 429], [459, 337], [1052, 368], [864, 187], [968, 596]]
     )
+
+    ## Plots section 2 - just to see if the points coordinates aren't reversed
+
     # for point in left_points:
     #     cv2.circle(left, tuple(point), 5, (0, 0, 255), -1)
     # for point in right_points:
@@ -628,38 +623,15 @@ def main():
     # axes[1].set_title("Right Image")
     # axes[1].axis("on")
     # plt.show()
-    #### Test for good transformation
-    homography_matrix = find_homography_matrix(left_points.T, right_points.T)
-    print(homography_matrix)
-    # final_img, _,_,_ = projective_transform(left, homography_matrix, display=True)
 
-    #### Test for good projection
-    # final_img, _, _, _ = projective_transform(left, homography_matrix, display=False)
-    # left_points_projected = get_pixel_coordinates_on_new_image_plane_yx(
-    #     homography_matrix, left_points_t, [0, 0]
-    # )
-    # print(left_points_projected)
-    # for point in left_points_projected:
-    #     cv2.circle(final_img, tuple(point), 5, (0, 0, 255), -1)
+    ## End of checking
 
-    # plt.imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
-    # plt.show()
+    #### Finding projective transformation
 
-    ########## Looking on projection to compare overlapping area
-    # final_img, _, beg, end = projective_transform(
-    #     left, homography_matrix, display=False
-    # )
-    # print(beg, end)
-    # x_min, y_min, x_max, y_max, shift = find_overlapping_area_and_shift(beg, end, right)
-    # print(x_min, y_min, x_max, y_max)
-    # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    # axes[0].imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
-    # axes[0].set_title("Projected Image")
-    # axes[0].axis("on")
-    # axes[1].imshow(cv2.cvtColor(right, cv2.COLOR_BGR2RGB))
-    # axes[1].set_title("Base Image")
-    # axes[1].axis("on")
-    # plt.show()
+    # homography_matrix = find_homography_matrix(left_points.T, right_points.T)
+    # print(homography_matrix)
+    # final_img, _, _, _ = projective_transform(left, homography_matrix, display=True)
+
     ######################## TASK 5 ########################
     # left = stitching_images[0]
     # right = stitching_images[1]
@@ -675,6 +647,7 @@ def main():
     #     left, homography_matrix, display=False
     # )
     # seam = some_dynamic_seam(left, right, homography_matrix)
+    ## If you want to sea the seam line, uncomment this or two segments in stitch_images function
     # # print(seam)
 
     # final_img = stich_images(final_img, right, seam, beg, end)
@@ -684,9 +657,15 @@ def main():
     # cv2.imwrite("task_5_stitched.jpg", final_img)
 
     ################### TASK 6 ####################
-    ## After preapring proper folders i want to use this command in cmd:
-    ## python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_6/ --input_pairs stitching_pairs_task_6.txt --output_dir matching_pairs --viz
-    # #in my folder I want to have img2(as base) and img1 and then do some standard things as I read file with matches, find homography and stitch images
+
+    # # First run this:
+    # text = "img1.png img2.png"
+    # with open("stitching_pairs_task_6.txt", "w") as file:
+    #     file.write(text)
+    # # After preapring proper folders(stitching_pairs_task_6.txt, stitching_task_6 folder) i want to use this command in cmd:
+
+    # python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_6/ --input_pairs stitching_pairs_task_6.txt --output_dir matching_pairs --viz
+    # in my folder I want to have img2(as base) and img1 and then do some standard things as I read file with matches, find homography and stitch images
 
     # npz = np.load("matching_pairs/img1_img2_matches.npz")
     # left_points = npz["keypoints0"]
@@ -711,18 +690,20 @@ def main():
     # cv2.imwrite("task_6_stitched.jpg", final_img)
 
     ######################## TASK 7 ########################
-    # current_image = cv2.imread("task_6_stitched.jpg")
-    # plt.imshow(cv2.cvtColor(current_image, cv2.COLOR_BGR2RGB))
-    # plt.show()
-    for i in range(4):
-        text = f"current_image.png img{i+3}.png"
-        with open(f"add_img_{i+3}.txt", "w") as file:
-            file.write(text)
 
-    ########## THE PROCEDURE #########
+    # # Run this first to have proper files:
+    # current_image = cv2.imread("task_6_stitched.jpg")
+    # for i in range(4):
+    #     text = f"current_image.png img{i+3}.png"
+    #     with open(f"add_img_{i+3}.txt", "w") as file:
+    #         file.write(text)
+
+    ########## THE PROCEDURE (don't uncomment this, it just shows the way I do things later on) #########
+    ##These 3 lines first:
     # for i in range(4):
     # base = cv2.imread("stitching_task_7_folder\current_image.png")
     # left = cv2.imread(f"img{i+3},png")
+    # Run this in cmd:
     # #python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_7_folder/ --input_pairs add_img_{i+3}.txt --output_dir matching_pairs_{i} --viz
     # npz = np.load("matching_pairs/img1_img2_matches.npz")
     # base_points = npz["keypoints0"]
@@ -746,11 +727,15 @@ def main():
     ########## END OF THE PROCEDURE #########
 
     ####### ADD IMAGE 3 #############
-
-    # base = cv2.imread("stitching_task_7_folder\current_image.png")
+    # Run this first to fill the folder with current_image.png
     # base = cv2.imread("task_6_stitched.jpg")
     # left = cv2.imread(f"stitching_task_7_folder\img3.png")
+    # cv2.imwrite("stitching_task_7_folder/current_image.png", base)
+
+    ## cmd time:
     # # python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_7_folder/ --input_pairs add_img_3.txt --output_dir matching_pairs_3 --viz
+    # base = cv2.imread("task_6_stitched.jpg")
+    # left = cv2.imread(f"stitching_task_7_folder\img3.png")
     # npz = np.load("matching_pairs_3\current_image_img3_matches.npz")
     # base_points = npz["keypoints0"]
     # new_base_points = []
@@ -762,29 +747,27 @@ def main():
 
     # left_points = np.array(left_points)
     # base_points = np.array(new_base_points)
-    # print("Check shapes")
-    # print(left_points.shape, base_points.shape)
-    # # homography_matrix = find_homography_matrix(left_points.T, base_points.T)
+
     # homography_matrix, indexes = RANSAC_find_homography_matrix(
-    #     left_points.T, base_points.T, n_interations=50, n_drop=10, epsilon=1
+    #     left_points.T, base_points.T, n_interations=70, n_drop=10, epsilon=1
     # )
     # print("RANSAC finished")
     # base_points = base_points[indexes]
     # left_points = left_points[indexes]
-    # print(base_points.shape, left_points.shape)
-    # print(homography_matrix.shape)
     # final_img, _, beg, end = projective_transform(
     #     left, homography_matrix, display=False
     # )
     # seam = some_dynamic_seam(left, base, homography_matrix)
     # final_img = stich_images(final_img, base, seam, beg, end)
     # cv2.imwrite("stitching_task_7_folder/current_image.png", final_img)
+    # cv2.imwrite("stitching_task_7_folder/image_after_3.png", final_img)
 
     # ############ ADD IMAGE 4 ########
 
+    ## cmd time:
+    # # python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_7_folder/ --input_pairs add_img_4.txt --output_dir matching_pairs_4 --viz
     # base = cv2.imread("stitching_task_7_folder\current_image.png")
     # left = cv2.imread(f"stitching_task_7_folder\img4.png")
-    # # python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_7_folder/ --input_pairs add_img_4.txt --output_dir matching_pairs_4 --viz
     # npz = np.load("matching_pairs_4\current_image_img4_matches.npz")
     # base_points = npz["keypoints0"]
     # new_base_points = []
@@ -796,63 +779,29 @@ def main():
 
     # left_points = np.array(left_points)
     # base_points = np.array(new_base_points)
-    # print("Check shapes")
-    # print(left_points.shape, base_points.shape)
-    # # homography_matrix = find_homography_matrix(left_points.T, base_points.T)
+
     # homography_matrix, indexes = RANSAC_find_homography_matrix(
-    #     left_points.T, base_points.T, n_interations=50, n_drop=10, epsilon=1
+    #     left_points.T, base_points.T, n_interations=300, n_drop=10, epsilon=1
     # )
     # print("RANSAC finished")
     # base_points = base_points[indexes]
     # left_points = left_points[indexes]
-    # print(base_points.shape, left_points.shape)
-    # print(homography_matrix.shape)
+
     # final_img, _, beg, end = projective_transform(
     #     left, homography_matrix, display=False
     # )
     # seam = some_dynamic_seam(left, base, homography_matrix)
     # final_img = stich_images(final_img, base, seam, beg, end)
     # cv2.imwrite("stitching_task_7_folder/current_image.png", final_img)
-
-    # ############ ADD IMAGE 5 ########
-
-    # base = cv2.imread("stitching_task_7_folder\current_image.png")
-    # left = cv2.imread(f"stitching_task_7_folder\img5.png")
-    # # python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_7_folder/ --input_pairs add_img_5.txt --output_dir matching_pairs_5 --viz
-    # npz = np.load("matching_pairs_5\current_image_img5_matches.npz")
-    # base_points = npz["keypoints0"]
-    # new_base_points = []
-    # left_points = []
-    # for i in range(len(base_points)):
-    #     if npz["matches"][i] != -1:
-    #         left_points.append(npz["keypoints1"][npz["matches"][i]])
-    #         new_base_points.append(base_points[i])
-
-    # left_points = np.array(left_points)
-    # base_points = np.array(new_base_points)
-    # print("Check shapes")
-    # print(left_points.shape, base_points.shape)
-    # # homography_matrix = find_homography_matrix(left_points.T, base_points.T)
-    # homography_matrix, indexes = RANSAC_find_homography_matrix(
-    #     left_points.T, base_points.T, n_interations=50, n_drop=10, epsilon=1.8
-    # ) ##INCREASED THE EPSILON AS RANSAC WAS RATHER WEAK
-    # print("RANSAC finished")
-    # base_points = base_points[indexes]
-    # left_points = left_points[indexes]
-    # print(base_points.shape, left_points.shape)
-    # print(homography_matrix.shape)
-    # final_img, _, beg, end = projective_transform(
-    #     left, homography_matrix, display=False
-    # )
-    # seam = some_dynamic_seam(left, base, homography_matrix)
-    # final_img = stich_images(final_img, base, seam, beg, end)
-    # cv2.imwrite("stitching_task_7_folder/current_image.png", final_img)
+    # cv2.imwrite("stitching_task_7_folder/image_after_4.png", final_img)
 
     ############ ADD IMAGE 6 ########
 
+    ## cmd time:
+    ## python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_7_folder/ --input_pairs add_img_6.txt --output_dir matching_pairs_6 --viz
     base = cv2.imread("stitching_task_7_folder\current_image.png")
     left = cv2.imread(f"stitching_task_7_folder\img6.png")
-    # python superglue\SuperGluePretrainedNetwork\match_pairs.py --resize -1 --superglue outdoor --max_keypoints 2048 --nms_radius 3  --resize_float --input_dir stitching_task_7_folder/ --input_pairs add_img_6.txt --output_dir matching_pairs_6 --viz
+
     npz = np.load("matching_pairs_6\current_image_img6_matches.npz")
     base_points = npz["keypoints0"]
     new_base_points = []
@@ -864,23 +813,21 @@ def main():
 
     left_points = np.array(left_points)
     base_points = np.array(new_base_points)
-    print("Check shapes")
-    print(left_points.shape, base_points.shape)
-    # homography_matrix = find_homography_matrix(left_points.T, base_points.T)
+
     homography_matrix, indexes = RANSAC_find_homography_matrix(
-        left_points.T, base_points.T, n_interations=50, n_drop=10, epsilon=1
+        left_points.T, base_points.T, n_interations=300, n_drop=10, epsilon=1
     )
     print("RANSAC finished")
     base_points = base_points[indexes]
     left_points = left_points[indexes]
-    print(base_points.shape, left_points.shape)
-    print(homography_matrix.shape)
+
     final_img, _, beg, end = projective_transform(
         left, homography_matrix, display=False
     )
     seam = some_dynamic_seam(left, base, homography_matrix)
     final_img = stich_images(final_img, base, seam, beg, end)
-    cv2.imwrite("stitching_task_7_folder/task_7_stitched.jpg", final_img)
+    cv2.imwrite("task_7_stitched.jpg", final_img)
+    cv2.imwrite("stitching_task_7_folder/image_after_6.png", final_img)
 
 
 if __name__ == "__main__":
