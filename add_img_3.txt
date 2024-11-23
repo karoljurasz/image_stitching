@@ -1,0 +1,1 @@
+current_image.png img3.png
